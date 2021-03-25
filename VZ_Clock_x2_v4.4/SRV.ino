@@ -12,7 +12,7 @@ void serverInit(void) {
   server.on("/function.js", [](){server.send_P ( 200, "text/plain", P_js);});
   server.on("/favicon.ico", [](){server.send(200, "text/html", "");});
   server.onNotFound([]() {(404, "text/plain", "FileNotFound");});
-  server.on("/configs.json", handle_ConfigJSON);    // формування configs.json сторінки для передачі данних в web інтерфейс
+  server.on("/configs.json", handle_ConfigJSON);    // формирование configs.json страницы для передачи данных в web интерфейс
   server.on("/configs_wifi.json", handle_ConfigWifiJson);
   server.on("/configs_time.json", handle_ConfigTimeJson);
   server.on("/configs_mqtt.json", handle_ConfigMqttJson);
@@ -21,11 +21,11 @@ void serverInit(void) {
   server.on("/configs_sgp.json", handle_ConfigSgpJson);
   server.on("/configs_thing.json", handle_ConfigThingJson);
   server.on("/ssid", handle_Set_Ssid);
-  server.on("/ntp", handle_ntp);         // Установка часової зони по запиту типа http://192.168.2.100/timeZone?timeZone=3
+  server.on("/ntp", handle_ntp);         // Установка часового пояса по запросу вида http://192.168.2.100/timeZone?timeZone=3
   server.on("/set_time", handle_set_time);
   server.on("/timepc", handle_timepc);
   server.on("/weatherUpdate", handle_weather_update);
-  server.on("/weather", handle_weather);    // Установка сервера погоди по запиту типа http://192.168.2.100/weatherHost?weatherHost=api.openweathermap.org
+  server.on("/weather", handle_weather);    // Установка сервера погоды по запросу вида http://192.168.2.100/weatherHost?weatherHost=api.openweathermap.org
   server.on("/mqttUst", handle_mqtt_ust);
   server.on("/mqttOn", handle_mqtt_on);
   server.on("/weathOn", handle_weath_on);
@@ -34,7 +34,7 @@ void serverInit(void) {
   server.on("/setup", handle_setup);
   server.on("/sgp", handle_sgp);
   server.on("/mess", handle_message);
-  server.on("/restart", handle_Restart);            // перезавантаження можуля по запиту типу http://192.168.1.11/restart?device=ok
+  server.on("/restart", handle_Restart);            // Перезагрузка модуля по запросу вида http://192.168.1.11/restart?device=ok
   server.on("/stopalarm", handle_stopAlarm);
   server.on("/resetConfig", handle_resetConfig);
   server.on("/printCom", handle_set_printCom);
@@ -1077,14 +1077,19 @@ void handle_message(){
   if(verific()) return;
   if(server.arg("text")!=""){
     server.send(200, "text/plain", "OK");
-    String text = server.arg("text").c_str();
-    for(int i = 0; i < 3; i++){
-      bip();
-    }
-    printStringWithShift(("        " + String(text) + "           ").c_str(), timeScrollSpeed, 1);
-    if(printCom) {
-      printTime();
-      Serial.println(text);
+    if (server.arg("delayed") == "1") {
+      String text = server.arg("text").c_str();
+      delayedString = text;
+    } else {
+      String text = server.arg("text").c_str();
+      for(int i = 0; i < 3; i++){
+        bip();
+      }
+      printStringWithShift(("        " + String(text) + "           ").c_str(), timeScrollSpeed, 1);
+      if(printCom) {
+        printTime();
+        Serial.println(text);
+      }
     }
   }
 }
@@ -1141,7 +1146,7 @@ void handle_Restart(){
     ESP.reset();
   }
 }
-//====================================== Тут функції для роботи з файловою системою
+//====================================== Функции для работы с файловой системой
 String getContentType(String filename){
   if (server.hasArg("download")) return "application/octet-stream";
   else if (filename.endsWith(".htm")) return "text/html";
@@ -1160,7 +1165,7 @@ String getContentType(String filename){
   else if (filename.endsWith(".gz")) return "application/x-gzip";
   return "text/plain";
 }
-//======================================= Читання файлу
+//======================================= Чтение файла
 bool handleFileRead(String path){
   if (path.endsWith("/")) path += "index.htm";
   String contentType = getContentType(path);
@@ -1175,7 +1180,7 @@ bool handleFileRead(String path){
   }
   return false;
 }
-//======================================== Завантаження файлу
+//======================================== Загрузка файла
 void handleFileUpload(){
   if (server.uri() != "/edit") return;
   HTTPUpload& upload = server.upload();
@@ -1192,7 +1197,7 @@ void handleFileUpload(){
       fsUploadFile.close();
   }
 }
-//======================================== Видалення файлу
+//======================================== Удаление файла
 void handleFileDelete(){
   if (server.args() == 0) return server.send(500, "text/plain", "BAD ARGS");
   String path = server.arg(0);
@@ -1204,7 +1209,7 @@ void handleFileDelete(){
   server.send(200, "text/plain", "");
   path = String();
 }
-//========================================= Створення файлу
+//========================================= Создание файла
 void handleFileCreate(){
   if (server.args() == 0)
     return server.send(500, "text/plain", "BAD ARGS");
@@ -1221,7 +1226,7 @@ void handleFileCreate(){
   server.send(200, "text/plain", "");
   path = String();
 }
-//========================================== Список файлів 
+//========================================== Список файлов
 void handleFileList(){
   if (!server.hasArg("dir")){
     server.send(500, "text/plain", "BAD ARGS");

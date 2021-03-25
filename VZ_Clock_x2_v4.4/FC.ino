@@ -1,24 +1,24 @@
-bool loadConfig() {                                                // Завантаження даних збереженних в файлі config.json
-  File configFile = SPIFFS.open("/config.json", "r");              // Відкриваемо файл на читання
-  if(!configFile) {                                                // якщо файл не знайдено ствоюємого його та записуємо в ньго данні з наших змінних
+bool loadConfig() {                                                // Загрузка данных сохранение в файл config.json
+  File configFile = SPIFFS.open("/config.json", "r");              // Открываем файл на чтение
+  if(!configFile) {                                                // если файл не найден создаем его и записываем в него данные из наших переменных
     if(printCom) Serial.println("Failed to open config file");
-    saveConfig();                                                  // Створюємо файл
+    saveConfig();                                                  // создаем файл
     configFile.close();
-    return false;                                                  // Повернення з помилкою
+    return false;                                                  // Возврат ошибки
   }
-  size_t size = configFile.size();                                 // Перевіряємо ромір файлу, будемо використовувати файл довжиною в 1024 байта
+  size_t size = configFile.size();                                 // Проверяем размер файла, будем использовать файл длиной в 1024 байта
   if(printCom) Serial.println("size config.file = " + (String) size);
   if(size > 4096) {
     if(printCom) Serial.println("Config file size is too large");
     configFile.close();
-    return false;                                                  // Повернення з помилкою
+    return false;                                                  // Возврат ошибки
   }
-  jsonConfig = configFile.readString();                            // завантажуємо файл конфігурації в глобальну змінну
-  DynamicJsonDocument doc(4096);                                   // Резервуємо память для json обекту буфер може розти по мірі необхідності переважно для ESP8266 
+  jsonConfig = configFile.readString();                            // Загружаем файл конфигурации в глобальную переменную
+  DynamicJsonDocument doc(4096);                                   // Резервируем память для json обектов буфер может расти по мере необходимости преимущественно для ESP8266
   deserializeJson(doc, jsonConfig);
   configFile.close();
   ssidAP = doc["ssidAP"].as<String>();
-  passwordAP = doc["passwordAP"].as<String>();                     // Так отримуємо рядок
+  passwordAP = doc["passwordAP"].as<String>();                     // Так получаем строку
   ssid = doc["ssid"].as<String>();
   password = doc["password"].as<String>();
   auth = doc["auth"].as<String>();
@@ -142,27 +142,27 @@ bool loadConfig() {                                                // Заван
   return true;
 }
 //================================================================================================================================================
-bool loadAlarm() {                                                // Завантаження даних збереженних в файлі config.json
-  File configFile = SPIFFS.open("/alarm.json", "r");              // Відкриваемо файл на читання
-  if(!configFile) {                                                // якщо файл не знайдено ствоюємого його та записуємо в ньго данні з наших змінних
+bool loadAlarm() {                                                // Загрузка данных сохранение в файл config.json
+  File configFile = SPIFFS.open("/alarm.json", "r");              // Открываем файл на чтение
+  if(!configFile) {                                                // если файл не найден создаем его и записываем в него данные из наших переменных
     if(printCom) Serial.println("Failed to open alarm file");
-    saveAlarm();                                                  // Створюємо файл
+    saveAlarm();                                                  // Создаем файл
     configFile.close();
-    return false;                                                  // Повернення з помилкою
+    return false;                                                  // Возврат ошибки
   }
-  size_t size = configFile.size();                                 // Перевіряємо ромір файлу, будемо використовувати файл довжиною в 1024 байта
+  size_t size = configFile.size();                                 // Проверяем размер файла, будем использовать файл длиной в 1024 байта
   if(printCom) Serial.println("size alarme.file = " + (String) size);
   if(size > 2048) {
     if(printCom) Serial.println("Config file size is too large");
     configFile.close();
-    return false;                                                  // Повернення з помилкою
+    return false;                                                  // Возврат ошибки
   }
-  jsonAlarm = configFile.readString();                            // завантажуємо файл конфігурації в глобальну змінну
-  DynamicJsonDocument doc(2048);                                   // Резервуємо память для json обекту буфер може розти по мірі необхідності переважно для ESP8266 
+  jsonAlarm = configFile.readString();                            // Загружаем файл конфигурации в глобальную переменную
+  DynamicJsonDocument doc(2048);                                   // Резервируем память для json обектов буфер может расти по мере необходимости преимущественно для ESP8266
   deserializeJson(doc, jsonAlarm);
   configFile.close();
   ntpServerName = doc["ntpServerName"].as<String>();
-  timeZone = doc["timeZone"];                                      // Так отримуємо число
+  timeZone = doc["timeZone"];                                      // Так получаем число
   isDayLightSaving = doc["isDayLightSaving"];
   alarme[0][0] = doc["al_0_0"];
   alarme[0][1] = doc["al_0_1"];
@@ -373,7 +373,7 @@ bool saveConfig() {
   if(serializeJson(doc, jsonConfig)==0){
     if(printCom) Serial.println(F("Failed to write to jsonConfig"));
   }  
-  File configFile = SPIFFS.open("/config.json", "w");                // Відкриваємо файл для запису
+  File configFile = SPIFFS.open("/config.json", "w");                // Открываем файл на запись
   if(!configFile) {
     configFile.close();
     return false;
@@ -447,7 +447,7 @@ bool saveAlarm() {
   if(serializeJson(doc, jsonAlarm)==0){
     if(printCom) Serial.println(F("Failed to write to jsonConfig"));
   }  
-  File configFile = SPIFFS.open("/alarm.json", "w");                // Відкриваємо файл для запису
+  File configFile = SPIFFS.open("/alarm.json", "w");                // Открываем файл на запись
   if(!configFile) {
     configFile.close();
     return false;

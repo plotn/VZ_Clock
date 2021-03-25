@@ -55,8 +55,8 @@ IPAddress apIP(192, 168, 4, 1);
 #include "P_thing.h"
 
 // ===================================================
-String ssid         = "IvanZah";
-String password     = "";
+String ssid = "plotn_onlime_m2";
+String password = "11223344";
 String ssidAP       = "ESP-Info";
 String passwordAP   = "11223344";
 String auth         = "1234asdf5678";
@@ -64,12 +64,13 @@ String weatherHost0 = "api.weatherbit.io";
 String weatherHost1 = "api.openweathermap.org";
 String weatherKey0  = "";
 String weatherKey1  = "";
-String cityID0      = "Kryvyy Rih";
-String cityID1      = "703845"; // Kryvyy Rih, "2925533"-Frankfurt
+String currencyHost  = "www.cbr-xml-daily.ru";
+String cityID0      = "Moscow";
+String cityID1      = "524901"; // Kryvyy Rih, "2925533"-Frankfurt
 boolean authOn = true;
 boolean weatherHost = 0;
 char   personalCityName[51] = "";
-String weatherLang = "uk";
+String weatherLang = "ru";
 String location_name = "";
 String location_region = "";
 String location_country = "";
@@ -90,6 +91,9 @@ String cityName;
 //int cityID0;
 String weatherString;
 String weatherStringZ;
+String currencyString;
+String delayedString;
+String currencyDay;
 bool animNotWeather = true;
 // ----------змінні для роботи з mqtt сервером
 char mqtt_server[21]       = "m13.cloudmqtt.com";
@@ -208,8 +212,8 @@ byte packetBuffer[NTP_PACKET_SIZE];
 WiFiUDP udp;
 unsigned int localPort = 2390;
 unsigned long epochNM;
-static const uint8_t monthDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};        // Кількість днів у місяцях
-#define LEAP_YEAR(Y) (((1970+Y)>0) && !((1970+Y)%4) && (((1970+Y)%100)||!((1970+Y)%400)))   // Високосні літа
+static const uint8_t monthDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};        // Число дней в месяцах
+#define LEAP_YEAR(Y) (((1970+Y)>0) && !((1970+Y)%4) && (((1970+Y)%100)||!((1970+Y)%400)))   // Високостные годы
 String weatherMain = "";
 String weatherDescription = "";
 String weatherLocation = "";
@@ -222,8 +226,8 @@ String dw, _month;
 String jsonConfig = "{}";
 String jsonAlarm = "{}";
 String jsonTime = "{}";
-// ---------- Змінні для роботи локального годинника
-float timeZone = 2.0;                                                                       //  часовий пояс
+// ---------- Переменные для работы локального часов
+float timeZone = 3.0;                                                                       //  часовой пояс
 float hourCorr;
 bool isDayLightSaving = true;
 int displayData = 1;                      // 0 - Не отображать, 1 - отображать статику, 2 - отображать в бегущей строке
@@ -231,7 +235,7 @@ long localEpoc = 0;
 long localMillisAtUpdate = 0;
 int hour=2,   minute=40,  second=42,  month=4,   day=6,   dayOfWeek=6,   year=2018;
 int g_hour, g_minute, g_second, g_month=1, g_day, g_dayOfWeek, g_year;
-bool statusUpdateNtpTime = 0;                                                               // якщо не "0" - то останнє оновленя часу було вдалим
+bool statusUpdateNtpTime = 0;                                                               // если не "0" - то последнее обновление времени было удачным
 String y, mon, wd, d, h, m, s, mes;
 uint8_t hourTest[3], minuteTest[3];
 int secFr, lastSecond, lastMinute;
@@ -504,6 +508,7 @@ void setup(){
         getWeatherDataz1();
       }
     }
+    getCurrencyData();
   }
 // ---------- MQTT client
   MQTTclient.setServer(mqtt_server, mqtt_port);
@@ -612,10 +617,10 @@ void reconnect() {
 //======================================================================================
 void loop() {
   if(updateOTA) ArduinoOTA.handle();
-  server.handleClient();                                                                // дозволяємо HTTP серверу відповідать на запити
-  updateTime();                                                                         // оновлюємо час
+  server.handleClient();                                                                // позволяем HTTP серверу ответить на запрос
+  updateTime();                                                                         // обновляем время
   buttonInter();
-  if(second != lastSecond) {                                                            // на початку нової секунди скидаємо secFr в "0"
+  if(second != lastSecond) {                                                            // в начале новой секунды сбрасываем secFr в "0"
     lastSecond = second;
     if (volBrightnessAuto) {
       //levelBridhtness = map(analogRead(brightPin), 1023, 0, 0, 15);
@@ -650,21 +655,21 @@ void loop() {
       }
       lastMinute=minute;
     }
-  } else secFr++;                                                                       // якщо секунда ще не скінчилась то нарощуємо лічильник циклів secFr
-  if(minute == 0 && second == 0 && secFr == 0 && (hour >= kuOn && hour < kuOff)) {      // сигнал кожду годину 
+  } else secFr++;                                                                       // если секунда еще не закончилась то наращиваем счетчик циклов secFr
+  if(minute == 0 && second == 0 && secFr == 0 && (hour >= kuOn && hour < kuOff)) {      // сигнал каждый час 
     bip();
     bip();
   }
-  //----------- РОБОТА З БУДИЛЬНИКОМ------------------------------------------------------
+  //----------- РАБОТА С БУДИЛЬНИКОМ------------------------------------------------------
   if(secFr == 0) {
-    if(second > 0 && alarms()) { // если вернулась 1 тоесть совпало время и режим alarm_numer= номеру совпадения
+    if(second > 0 && alarms()) { // если вернулась 1 то есть совпало время и режим alarm_numer = номеру совпадения
       if(!alarm_stat && alarm_numer != 255 && !alarm_hold) alarm_stat = 1;
     } else if(alarm_stat) {
       alarm_stat = 0;
       if(alarme[alarm_numer][2] == 11) alarme[alarm_numer][2] = 0; // если будильник был разовый то выключаем его
     } else if(alarm_hold != 0);
   }
-  //------------- РОБОТА ЗІ СВЯТКОВИМИ ДАТАМИ ---------------------------------------------
+  //------------- РАБОТА С ПРАЗДНИЧНЫМИ ДАТАМИ ---------------------------------------------
   if(secFr == 0) {
     if(minute == 0) {
       if(hour >= memory_hour_start && hour <= memory_hour_end && second < 15 && second > 2 && !alarm_stat){
@@ -685,7 +690,7 @@ void loop() {
   }
   buttonHandling();
   //------------- НАШ ЧАС ----------------------------------------------------------------
-  if(hour == 22 && minute == 55) {                                                      // якщо наш час - то іде повідомлення для коханої
+  if(hour == 22 && minute == 55) {                                                      // если наше время - идет сообщение для любимой (видимо пасхалка какая то)
     //bip();
     //bip();
     //bip();
@@ -695,7 +700,7 @@ void loop() {
 
   // ************ Все функции выполняются один раз в секунду ************************************************
   if(secFr == 0){
-      // ---------- ВИВІД НА ЕКРАН ГОДИННИКА АБО ТЕМПЕРАТУРИ ЧИ ВОЛОГОСТІ------------------------
+      // ---------- ВЫВОД НА ЭКРАН ЧАСОВ ИЛИ ТЕМПЕРАТУРЫ ИЛИ ВЛАЖНОСТИ ------------------------
     if(!alarm_stat && butMode == 0) {
       if(second == 40 && sensor00 && timeStopBigCklock) {
         showSimple(0);
@@ -737,10 +742,10 @@ void loop() {
         }
       }
     }
-    // ---------- 10 секунда - виводимо дату/погоду----------------------------------------------------------
+    // ---------- 10 секунда - выводим дату/погоду----------------------------------------------------------
     if(second == 10 && !alarm_stat) {
       sensorsAll();
-      if(hour >= timeStartViewWeather && hour < timeEndViewWeather && !(clock2line && (hour<timeDay || hour>=timeNight)) && butMode == 0) {        // працує тілки в дозволений час
+      if(hour >= timeStartViewWeather && hour < timeEndViewWeather && !(clock2line && (hour<timeDay || hour>=timeNight)) && butMode == 0) {        // работает только в разрешенное время
         if(minute % 2 == 0 || !displayForecast) {
           if(displayData == 1){
             clr(1);
@@ -769,19 +774,25 @@ void loop() {
             else if(updateForecast >= 360) weatherString = tWeatrNot;
             printStringWithShift(weatherString.c_str(), timeScrollSpeed, 1);
             if(updateForecasttomorrow<30) printStringWithShift(weatherStringZ.c_str(), timeScrollSpeed, 1);
+            if(currencyString != "") printStringWithShift(currencyString.c_str(), timeScrollSpeed, 1);  
+            if ((minute % 3 == 0) && (delayedString != "")) {
+              delayedString = " <" + delayedString + ">              ";
+              printStringWithShift(delayedString.c_str(), timeScrollSpeed, 1);  
+              delayedString = "";
+            }
           }
           if(sensor00&&!bigCklock) showSimple(0);
         }
       }
     }
-    // ---------- 43 секунда оновленя мережевого часу кожну хвилину або в 5 хвилину кожного часу ------------------------
+    // ---------- 43 секунда обновления сетевого времени каждую минуту или в 5 минуту каждого часа ------------------------
     if(((statusUpdateNtpTime == 0 && second == 43) || (minute == 02 && second == 43)) && !alarm_stat) timeUpdateNTP();
     // ---------- 46 cек. две функции -----------------------------------------------------------------------------------
     if(second==46){
       //  перевірка доступності WiFi мережі ---
       if(!alarm_stat){
         if(apStart && millis()>600000) apStart=0; // через 10 минут после страта если нет подключения к Wifi - можно пробовать переподключиться
-        if((WiFi.status() != WL_CONNECTED || !WIFI_connected) && !apStart) {  // повторне підк. до WiFi кожну 1, 6, 11, 16...56 хв.
+        if((WiFi.status() != WL_CONNECTED || !WIFI_connected) && !apStart) {  // повторное подключение к WiFi каждую 1, 6, 11, 16...56 минуту
           WIFI_connected = false;
           if(minute % 5 == 1) {
             wifiConnect();
@@ -789,7 +800,7 @@ void loop() {
           }
         }
       }
-      //оновлюємо прогноз погоди (во время отображения, каждую 14 и 44 миунту или когда не получен прогноз и когда разрешен показ 
+      //обновление прогноза погоды (во время отображения, каждую 14 и 44 миунту или когда не получен прогноз и когда разрешен показ 
       if((hour>=timeStartViewWeather&&hour<=timeEndViewWeather&&!alarm_stat) && (minute==14||minute==44||updateForecast||updateForecasttomorrow) && displayForecast &&  WIFI_connected){
         if(minute == 14 || minute == 44) {
           if(!weatherHost) {
@@ -799,6 +810,7 @@ void loop() {
             getWeatherData1();
             getWeatherDataz1();
           }
+          getCurrencyData();
         } else {
           if(updateForecast){
             if(!weatherHost) {
@@ -814,6 +826,7 @@ void loop() {
               getWeatherDataz1();
             }
           }
+          getCurrencyData();
         }
         if(sensor01==9) getNarodmon();
         if(mqttOn && !MQTTclient.connected()) {
@@ -822,7 +835,7 @@ void loop() {
         }
       }
     }
-    // ---------- 50 сек. перевірка доступності MQTT та публікація температури ---------
+    // ---------- 50 сек. проверка доступности MQTT и публикация температуры ---------
     if(second == 50 && mqttOn && !alarm_stat && WIFI_connected) {
       if(WiFi.status() != WL_CONNECTED) {
         WIFI_connected = false;
@@ -905,9 +918,9 @@ void loop() {
   }//************** все функции выполнялись раз в секунду*******************************************
 
   
-  // ---------- якщо мережа WiFi доступна то виконуємо наступні функції ----------------------------
+  // ---------- если сеть WiFi доступна то выполняем следующие функции ----------------------------
   if(WIFI_connected){
-    if(mqttOn) MQTTclient.loop();           // перевіряємо чи намає вхідних повідомлень, як є, то кoлбек функція
+    if(mqttOn) MQTTclient.loop();           // проверяем что нет входящих сообщений, если есть, то кoлбек функция
   }
   if(secFr==0 && butMode != 0){ // если отработали все функции работы с кнопкой, то состояние сбросится автоматом
     Serial.println("BUT MODE RESET");
@@ -959,7 +972,7 @@ void showSimple(byte num){
     else showSimpleBattery(param4, data04);
   }
 }
-//========== ВИВІД НА ЕКРАН ТЕМПЕРАТУРИ ================================================
+//========== ВЫВОД НА ЭКРАН ТЕМПЕРАТУРЫ ================================================
 void showSimpleTemperature(byte znakT, float temp0) {
   bigCklock = 0;
   timerStopBigCklock=millis();
@@ -970,7 +983,7 @@ void showSimpleTemperature(byte znakT, float temp0) {
   byte indent = (NUM_MAX1 * 8) - 32;
   dx = dy = 0;
   clr(1);
-  showDigit((temp0 < 0.0 ? digPos[znak*2+1]:digPos[znak*2]), 0 + indent, (fontSizeData?znaki5x7:znaki5x8), 1); // друкуємо t+ альбо t-
+  showDigit((temp0 < 0.0 ? digPos[znak*2+1]:digPos[znak*2]), 0 + indent, (fontSizeData?znaki5x7:znaki5x8), 1); // печатаем t+ или t-
   if(temp1 <= -10.0 || temp1 >= 10) showDigit((temp1 < 0 ? (temp1 * -1) / 10 : temp1 / 10), 4 + indent, (fontSizeData?dig5x7:dig5x8), 1);
   showDigit((temp1 < 0 ? (temp1 * -1) % 10 : temp1 % 10), 10 + indent, (fontSizeData?dig5x7:dig5x8), 1);
   showDigit(2, 16 + indent, (fontSizeData?znaki5x7:znaki5x8), 1);
@@ -980,7 +993,7 @@ void showSimpleTemperature(byte znakT, float temp0) {
   if(dataDown) scrollDown(1);
   refreshAll();
 }
-//========== ВИВІД НА ЕКРАН ВОЛОГОСТІ ==================================================
+//========== ВЫВОД НА ЭКРАН ВЛАЖНОСТИ ==================================================
 void showSimpleHumidity(byte znakT, float humi0) {
   bigCklock = 0;
   timerStopBigCklock=millis();
@@ -1002,7 +1015,7 @@ void showSimpleHumidity(byte znakT, float humi0) {
     refreshAll();
   }
 }
-//==========ВИВІД НА ЕКРАН ТИСКУ =================================================
+//==========ВЫВОД НА ЭКРАН ДАВЛЕНИЯ =================================================
 void showSimplePressure(byte znakT, float press0){
   bigCklock = 0;
   timerStopBigCklock=millis();
@@ -1027,7 +1040,7 @@ void showSimplePressure(byte znakT, float press0){
     refreshAll();
   }
 }
-//========== ВИВІД НА ЕКРАН БАТАРЕЇ ==================================================
+//========== ВЫВОД НА ЭКРАН БАТАРЕИ ==================================================
 void showSimpleBattery(byte znakT, float batt0) {
   bigCklock = 0;
   timerStopBigCklock=millis();
@@ -1037,7 +1050,7 @@ void showSimpleBattery(byte znakT, float batt0) {
     byte indent = (NUM_MAX1 * 8) - 32;
     dx = dy = 0;
     clr(1);
-    showDigit(znakT+5, 0 + indent, (fontSizeData?znaki5x7:znaki5x8), 1);     // друкуємо знак вологості
+    showDigit(znakT+5, 0 + indent, (fontSizeData?znaki5x7:znaki5x8), 1);     // печатаем знак влажности
     if(batt1 >= 10) showDigit(batt1/10, 6 + indent, (fontSizeData?dig5x7:dig5x8), 1);
     showDigit((batt1-(batt1/10)*10), 12 + indent, (fontSizeData?dig5x7:dig5x8), 1);
     showDigit(2, 18 + indent, (fontSizeData?znaki5x7:znaki5x8), 1);
@@ -1047,7 +1060,7 @@ void showSimpleBattery(byte znakT, float batt0) {
     refreshAll();
   }
 }
-//==========ВИВІД НА ЕКРАН ДОДАТКОВИХ ДАННИХ========================================
+//==========ВЫВОД НА ЭКРАН ДОПОЛНИТЕЛЬНЫХ ДАННЫХ========================================
 void showSimpleNumeric(byte znakT, float numer0){
   bigCklock = 0;
   timerStopBigCklock=millis();
@@ -1082,7 +1095,7 @@ void showSimpleNumeric(byte znakT, float numer0){
 }
 
 
-//==========ВИВІД НА ЕКРАН ДАТИ=========================================================
+//==========ВЫВОД НА ЭКРАН ДАТЫ=========================================================
 void showSimpleDate(){
   bigCklock = 0;
   timerStopBigCklock=millis()+((8-timeStopBigCklock)*1000);
@@ -1115,7 +1128,7 @@ void showSimpleDate(){
   if(dataDown) scrollDown(1);
   refreshAll();
 }
-//==========ВИВІД НА ЕКРАН АНІМАЦІЙНОГО ГОДИННИКА=======================================
+//==========ВЫВОД НА ЭКРАН АНИМАЦИОННОГО ЧАСОВ=======================================
 void showAnimClock(){
   byte digPos[6] {5, 10, 18, 23, 15, 47,}; //digPos[0-3] первая-четвертая цифра, digPos[4] - начало точек верняя строка digPos[5] - нижнаяя строка 
   byte digPos2[6] {0, 6, 13, 19, 25, 11};
@@ -1430,7 +1443,7 @@ void showAnimClock(){
   }
   refreshAll();
 }
-//==========ДРУКУВАННЯ БІГУЧОЇ СТРОКИ *s - текст, shiftDelay - швидкість, zone - зона екрану==================
+//========== ПЕЧАТЬ БЕГУЩЕЙ СРОКИ *s - текст, shiftDelay - скорость, zone - зона экрана==================
 void printStringWithShift(const char* s, int shiftDelay, byte zone) {
   bool oldBigCklok = bigCklock;
   bigCklock = 0;
@@ -1451,7 +1464,7 @@ void printStringWithShift(const char* s, int shiftDelay, byte zone) {
   runningLine = 0;
   bigCklock = oldBigCklok;
 }
-//==========ДРУКУВАННЯ БІГУЧОГО СИМВОЛУ с - символ, shiftDelay - швидкість, zone - зона екрану================
+//==========ПЕЧАТЬ БЕГУЩЕГО СИМВОЛА с - символ, shiftDelay - скорость, zone - зона экрана================
 void printCharWithShift(unsigned char c, int shiftDelay, byte zone) {
   c = convert_fonts(c);
   if(c < ' ') return;
@@ -1463,7 +1476,7 @@ void printCharWithShift(unsigned char c, int shiftDelay, byte zone) {
     refreshAll();
   }
 }
-//==========ВИІД СИМВОЛУ НА ЕКРАН ch -  код символу, *data -  посилання на шрифт, zone - зона екрану===========
+//==========ВЫВОД СИМВОЛА НА ЭКРАН ch -  код символа, *data -  ссылка на шрифт, zone - зона экрана===========
 int showChar(char ch, const uint8_t *data, byte zone) {
   int len = pgm_read_byte(data);
   int i,w = pgm_read_byte(data + 1 + ch * len);
@@ -1473,7 +1486,7 @@ int showChar(char ch, const uint8_t *data, byte zone) {
   scr[(zone?NUM_MAX0+NUM_MAX1:NUM_MAX0) * 8 + i] = 0;
   return w;
 }
-//==========ВИІД СИМВОЛУ НА ЕКРАН ch -  код символу, col- позиція, *data -  посилання на шрифт, zone - зона екрану===========
+//==========ВЫВОД СИМВОЛА НА ЭКРАН ch -  код символа, col- позиция, *data -  ссылка на шрифт, zone - зона экрана===========
 void showDigit(char ch, int col, const uint8_t *data, byte zone) {
   if(dy < -8 | dy > 8) return;
   int len = pgm_read_byte(data);
@@ -1496,7 +1509,7 @@ void setCol(int col, byte v) {
   }
 }
 
-//==========КОНВЕРТАЦІЯ СИМВОЛІВ В РАЗІ ВИКОРИСТАННЯ УКРАЇНСЬКИХ ЛІТЕР==================
+//==========КОНВЕРТАЦИЯ СИМВОЛОВ В СЛУЧАЕ ИСПОЛЬЗОВАНИЯ УКРАИНСКИХ ЛИТЕР==================
 byte dualChar = 0;
 unsigned char convert_fonts(unsigned char _c) {
   unsigned char c = _c;
@@ -1593,7 +1606,7 @@ void saveChrMas(String string_t, byte lenght_off, byte number_s) {
     s++;
   }
 }
-//==========ОНОВЛЕННЯ ЛОКАЛЬНОГО ЧАСУ (ЛОКАЛЬНІ ЧАСИ)===============================================================
+//==========ОБНОВЛЕНИЕ МЕСТНОГО ВРЕМЕНИ (ЛОКАЛЬНОЕ ВРЕМЯ)===============================================================
 void updateTime() {
   long curEpoch = localEpoc + ((millis() - localMillisAtUpdate) / 1000);
   long epoch = round(curEpoch + 86400L);
@@ -1602,7 +1615,7 @@ void updateTime() {
   minute = (epoch % 3600) / 60;
   second = epoch % 60;
 }
-//==========ОНОВЛЕННЯ МЕРЕЖЕВОГО ЧАСУ (перевірка в три проходи)====================================================
+//==========ОБНОВЛЕНИЕ СЕТЕВОГО ВРЕМЕНИ (проверка в три прохода)====================================================
 void timeUpdateNTP(){
   if(!WIFI_connected) return;
   if(printCom){
@@ -1666,7 +1679,7 @@ void timeUpdateNTP(){
   }
   saveTime();
 }
-//==========ОТРИМАННЯ ДАТИ ТА ЧАСУ ВІД СЕРВЕРА ТОЧНОГО ЧАСУ =============================================================
+//==========ПОЛУЧЕНИЕ ДАТЫ И ВРЕМЕНИ С СЕРВЕРА ТОЧНОГО ВРЕМЕНИ=============================================================
 void getNTPtime(){
   WiFi.hostByName(ntpServerName.c_str(), timeServerIP); 
   int cb;
@@ -1683,26 +1696,26 @@ void getNTPtime(){
     udp.beginPacket(timeServerIP, 123);                     //NTP порт 123
     udp.write(packetBuffer, NTP_PACKET_SIZE);
     udp.endPacket();
-    delay(800);                                             // чекаємо пів секуни
+    delay(800);                                             // ждем полсекунды
     cb = udp.parsePacket();
     if(!cb && printCom) Serial.println("          no packet yet..." + String (i + 1)); 
-    if(!cb && i == 2) {                                              // якщо час не отримано
+    if(!cb && i == 2) {                                              // если время не получено
       statusUpdateNtpTime = 0;
-      return;                                             // вихіз з getNTPtime()
+      return;                                             // выход из getNTPtime()
     }
     if(cb) i = 3;
   }
-  if(cb) {                                                   // якщо отримали пакет з серверу
+  if(cb) {                                                   // если получили пакет с сервера
     udp.read(packetBuffer, NTP_PACKET_SIZE);
     unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
     unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
     unsigned long secsSince1900 = highWord << 16 | lowWord;
-    const unsigned long seventyYears = 2208988800UL;        // Unix час станом на 1 січня 1970. в секундах, то 2208988800:
+    const unsigned long seventyYears = 2208988800UL;        // Unix время прошедшее с 1 января 1970. в секундах, то 2208988800:
     unsigned long epoch = secsSince1900 - seventyYears;
     epochNM = epoch - (millis()/1000);
     boolean summerTime;
-    if(month < 3 || month > 10) summerTime = false;             // не переходимо на літній час в січні, лютому, листопаді і грудню
-    if(month > 3 && month < 10) summerTime = true;              // Sommerzeit лічимо в квіні, травні, червені, липні, серпені, вересені
+    if(month < 3 || month > 10) summerTime = false;             // не переходим на летнее время в январе, феврале, ноябре и декабре
+    if(month > 3 && month < 10) summerTime = true;              // Летнее время считаем в апреле, мае, июне, июле, августе и сентябре
     if(month == 3 && (hour + 24 * day) >= (3 + 24 * (31 - (5 * year / 4 + 4) % 7)) || month == 10 && (hour + 24 * day) < (3 + 24 * (31 - (5 * year / 4 + 1) % 7))) summerTime = true; 
     epoch = epoch + (int)(timeZone*3600 + (3600*(isDayLightSaving && summerTime)));
     hourCorr = timeZone + (isDayLightSaving && summerTime);
@@ -1739,7 +1752,7 @@ void getNTPtime(){
   if(printCom) Serial.println("Nie ma czasu(((");
 }
 //===============================================================================================================================//
-//                              БЕРЕМО ПОГОДУ З САЙТУ  https://www.weatherbit.io                                                 //
+//                               БЕРЕМ ПОГОДУ С САЙТА  https://www.weatherbit.io                                                 //
 //===============================================================================================================================//
 void getWeatherData0() {
   if(weatherKey0=="" || !displayForecast) return;
@@ -1840,7 +1853,7 @@ void getWeatherData0() {
   const char*   data_city_name = data["city_name"]; // "Kiev"
   location_name = data_city_name;
   location_wind_spd = data["wind_spd"]; // 1
-  const char* data_wind_cdir_full = data["wind_cdir_full"]; // "пі́вдень-пі́вдень-схід"
+  const char* data_wind_cdir_full = data["wind_cdir_full"]; // "пі́вдень-пі́вдень-схід" // "юг-юг-восток"
   location_wind_cdir_full = data_wind_cdir_full;
   location_vis = data["vis"]; // 5
   const char*   data_sunset = data["sunset"]; // "16:01"
@@ -1855,14 +1868,14 @@ void getWeatherData0() {
   location_temp = data["temp"]; // 10.6
   location_app_temp = data["app_temp"]; // 10.6
   String windDegString;
-  if(data_wind_dir >= 345 || data_wind_dir <= 22)  windDegString = "\211";    //"Північний";
-  if(data_wind_dir >= 23  && data_wind_dir <= 68)  windDegString = "\234";    //"Північно-східний";
-  if(data_wind_dir >= 69  && data_wind_dir <= 114) windDegString = "\230";    //"Східний";
-  if(data_wind_dir >= 115 && data_wind_dir <= 160) windDegString = "\235";    //"Південно-східний";
-  if(data_wind_dir >= 161 && data_wind_dir <= 206) windDegString = "\210";    //"Південний";
-  if(data_wind_dir >= 207 && data_wind_dir <= 252) windDegString = "\232";    //"Південно-західний";
-  if(data_wind_dir >= 253 && data_wind_dir <= 298) windDegString = "\231";    //"Західний";
-  if(data_wind_dir >= 299 && data_wind_dir <= 344) windDegString = "\233";    //"Північно-західний";
+  if(data_wind_dir >= 345 || data_wind_dir <= 22)  windDegString = "\211";    //"Північний"; // Северный
+  if(data_wind_dir >= 23  && data_wind_dir <= 68)  windDegString = "\234";    //"Північно-східний"; // Северо-восточный
+  if(data_wind_dir >= 69  && data_wind_dir <= 114) windDegString = "\230";    //"Східний"; // Восточный
+  if(data_wind_dir >= 115 && data_wind_dir <= 160) windDegString = "\235";    //"Південно-східний"; // Юго-восточный
+  if(data_wind_dir >= 161 && data_wind_dir <= 206) windDegString = "\210";    //"Південний"; // Южный
+  if(data_wind_dir >= 207 && data_wind_dir <= 252) windDegString = "\232";    //"Південно-західний"; // Юго-западный
+  if(data_wind_dir >= 253 && data_wind_dir <= 298) windDegString = "\231";    //"Західний"; // Западный
+  if(data_wind_dir >= 299 && data_wind_dir <= 344) windDegString = "\233";    //"Північно-західний"; // Северо-западный
   weatherString = "         ";
   if(displayCityName){
     String PCN=personalCityName;
@@ -1885,8 +1898,100 @@ void getWeatherData0() {
     Serial.println("======== END ==========================================");
   }
 }
+
+void getCurrencyData() {
+  if (!date.equals("")) 
+    if (date.equals(currencyDay)) {
+      return; // if day hasnt changed
+      
+    }
+  if(!WIFI_connected) {  
+    return;
+  }
+  if(printCom) {
+    printTime();
+    Serial.println("Getting currency rates ...");
+  }
+  
+  if(ESPclient.connect(currencyHost.c_str(), 80)) {
+  } else {
+    if(printCom) Serial.println("          Not connection server!!!");    
+    return;
+  }
+
+  HTTPClient http;
+  String line="";
+  String reqline="http://"+currencyHost+"/daily_json.js";
+  if(printCom) {
+    Serial.println("=======================================================");
+    Serial.println(reqline);
+    Serial.println("=======================================================");
+  }  
+  if (http.begin(ESPclient, reqline)) { // HTTP
+    int httpCode = http.GET();
+    if (httpCode > 0) {
+      Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+      if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+        line = http.getString();
+      }
+    } else {
+      Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+  } else {
+    Serial.printf("[HTTP} Unable to connect\n");
+  }  
+  if(printCom) {
+    Serial.print("line =");
+    Serial.println(line);
+  }
+
+  //currencyString = line;
+  //return;
+  
+  const size_t capacity = JSON_OBJECT_SIZE(5) + 34*JSON_OBJECT_SIZE(7) + JSON_OBJECT_SIZE(34); //https://arduinojson.org/v6/assistant/
+  DynamicJsonDocument doc(capacity);
+  deserializeJson(doc, line);
+  if(!doc.capacity()){
+    if(printCom) Serial.println("          Parse currency - FAILED!!!");
+    return;
+  }
+  JsonObject Valute = doc["Valute"];
+  
+  JsonObject Valute_EUR = Valute["EUR"];
+  const char* Valute_EUR_ID = Valute_EUR["ID"]; // "R01239"
+  const char* Valute_EUR_NumCode = Valute_EUR["NumCode"]; // "978"
+  const char* Valute_EUR_CharCode = Valute_EUR["CharCode"]; // "EUR"
+  int Valute_EUR_Nominal = Valute_EUR["Nominal"]; // 1
+  const char* Valute_EUR_Name = Valute_EUR["Name"]; // "Евро"
+  float Valute_EUR_Value = Valute_EUR["Value"]; // 77.9658
+  float Valute_EUR_Previous = Valute_EUR["Previous"]; // 77.3245
+
+  JsonObject Valute_USD = Valute["USD"];
+  const char* Valute_USD_ID = Valute_USD["ID"]; // "R01235"
+  const char* Valute_USD_NumCode = Valute_USD["NumCode"]; // "840"
+  const char* Valute_USD_CharCode = Valute_USD["CharCode"]; // "USD"
+  int Valute_USD_Nominal = Valute_USD["Nominal"]; // 1
+  const char* Valute_USD_Name = Valute_USD["Name"]; // "Доллар США"
+  float Valute_USD_Value = Valute_USD["Value"]; // 68.6319
+  float Valute_USD_Previous = Valute_USD["Previous"]; // 69.0151
+
+  if (Valute_USD_Value < 0.01) return;
+  if (Valute_EUR_Value < 0.01) return;
+
+  currencyString = "         ";
+  currencyDay = date;  
+  currencyString = "USD = " + String(String((Valute_USD_Value), 2))+" RUB";
+  if (Valute_USD_Value > Valute_USD_Previous) currencyString = currencyString + "(+)";
+  if (Valute_USD_Value < Valute_USD_Previous) currencyString = currencyString + "(-)";
+  currencyString = currencyString + "; EUR = " + String(String((Valute_EUR_Value), 2))+" RUB";
+  if (Valute_EUR_Value > Valute_EUR_Previous) currencyString = currencyString + "(+)";
+  if (Valute_EUR_Value < Valute_EUR_Previous) currencyString = currencyString + "(-)";
+  currencyString = currencyString + "                ";
+}
+
 //===============================================================================================================================//
-//                              БЕРЕМО ПОГОДУ З САЙТУ  openweathermap.org                                                     //
+//                                  БЕРЕМ ПОГОДУ С САЙТА  openweathermap.org                                                     //
 //===============================================================================================================================//
 void getWeatherData1(){
   if(weatherKey1=="" || !displayForecast) return;
@@ -1994,14 +2099,14 @@ void getWeatherData1(){
   const char*   data_city_name = doc["name"]; // "Kyiv"
   location_name = data_city_name;
   String windDegString;
-  if(data_wind_dir >= 345 || data_wind_dir <= 22)  windDegString = "\211";    //"Північний";
-  if(data_wind_dir >= 23  && data_wind_dir <= 68)  windDegString = "\234";    //"Північно-східний";
-  if(data_wind_dir >= 69  && data_wind_dir <= 114) windDegString = "\230";    //"Східний";
-  if(data_wind_dir >= 115 && data_wind_dir <= 160) windDegString = "\235";    //"Південно-східний";
-  if(data_wind_dir >= 161 && data_wind_dir <= 206) windDegString = "\210";    //"Південний";
-  if(data_wind_dir >= 207 && data_wind_dir <= 252) windDegString = "\232";    //"Південно-західний";
-  if(data_wind_dir >= 253 && data_wind_dir <= 298) windDegString = "\231";    //"Західний";
-  if(data_wind_dir >= 299 && data_wind_dir <= 344) windDegString = "\233";    //"Північно-західний";
+  if(data_wind_dir >= 345 || data_wind_dir <= 22)  windDegString = "\211";    //"Північний"; //северный
+  if(data_wind_dir >= 23  && data_wind_dir <= 68)  windDegString = "\234";    //"Північно-східний"; // Северо-восточный
+  if(data_wind_dir >= 69  && data_wind_dir <= 114) windDegString = "\230";    //"Східний"; // Восточный
+  if(data_wind_dir >= 115 && data_wind_dir <= 160) windDegString = "\235";    //"Південно-східний"; //Юго-восточный
+  if(data_wind_dir >= 161 && data_wind_dir <= 206) windDegString = "\210";    //"Південний"; //южный
+  if(data_wind_dir >= 207 && data_wind_dir <= 252) windDegString = "\232";    //"Південно-західний"; //Юго-западный
+  if(data_wind_dir >= 253 && data_wind_dir <= 298) windDegString = "\231";    //"Західний"; // Западный
+  if(data_wind_dir >= 299 && data_wind_dir <= 344) windDegString = "\233";    //"Північно-західний"; //Северо-западный
   weatherString = "         ";
   if(displayCityName){
     String PCN=personalCityName;
@@ -2025,7 +2130,7 @@ void getWeatherData1(){
   }
 }
 // ============================================================================//
-//               Беремо ПРОГНОЗ!!! погоди з сайту https://www.weatherbit.io     // 
+//               Берем ПРОГНОЗ!!! погоды с сайта https://www.weatherbit.io     // 
 // ============================================================================//
 void getWeatherDataz0() {
   if(weatherKey0=="" || !displayForecast) return;
@@ -2089,7 +2194,7 @@ void getWeatherDataz0() {
   }
   JsonObject data_0 = doc["data"][0];
   JsonObject data_0_weather = data_0["weather"];
-  const char* data_0_weather_description = data_0_weather["description"]; // "Помірний дощ"
+  const char* data_0_weather_description = data_0_weather["description"]; // "Помірний дощ" //умеренный дождь
   float data_0_max_temp = data_0["max_temp"]; // 13.4
   float data_0_min_temp = data_0["min_temp"]; // 10.9
   JsonObject data_1 = doc["data"][1];
@@ -2097,7 +2202,7 @@ void getWeatherDataz0() {
   int data_1_clouds = data_1["clouds"]; // 58
   float data_1_wind_spd = data_1["wind_spd"]; // 3.75302
   JsonObject data_1_weather = data_1["weather"];
-  const char* data_1_weather_description = data_1_weather["description"]; // "Світло душ дощ"
+  const char* data_1_weather_description = data_1_weather["description"]; // "Світло душ дощ" // ?? Интересно какой это дождь
   float data_1_max_temp = data_1["max_temp"]; // 16.3
   float data_1_min_temp = data_1["min_temp"]; // 10
   weatherStringZ = "";
@@ -2123,7 +2228,7 @@ void getWeatherDataz0() {
   }
 }
 // =======================================================================//
-//               Беремо ПРОГНОЗ!!! погоди з сайту openweathermap.org      //
+//               Берем ПРОГНОЗ!!! погоды с сайта openweathermap.org       //
 // =======================================================================//
 void getWeatherDataz1(){
   if(weatherKey1=="" || !displayForecast) return;
@@ -2352,7 +2457,11 @@ void wifiConnect(){
     printTime();
     Serial.print("Connecting WiFi (ssid="+String(ssid.c_str())+"  pass="+String(password.c_str())+") ");
   }
+  //WiFi.persistent(false); //plotn - from my version, check if this is needed
   WiFi.disconnect();
+  //delay(200);
+  //WiFi.setOutputPower(20);
+  //WiFi.setSleepMode(WIFI_MODEM_SLEEP);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid.c_str(), password.c_str());
   delay (1000);
@@ -2512,14 +2621,14 @@ void sensorsDs18b20(){  //1
   byte type_s;
   byte data[12];
   byte addr[8];
-  if(!ds.search(addr)) {                                // Стартуємо функцію пошук першого або наступного датчика в addr-возвращаем ответ датчика
-    ds.reset_search();                                  // Якщо добігли кінця адресного простору, то скидуємо адрес на початок простору
+  if(!ds.search(addr)) {                                // Стартуем функцию поиска первого или следующего датчика в addr-возвращаем ответ датчика
+    ds.reset_search();                                  // Если подошли к концу адресного пространства, то сбрасываем адрес на начало пространства
     delay(250);                                         // Пауза
     ds18b20Found=false;
-    return;                                             // Виходимо з підпрограми
+    return;                                             // Выходим из подпрограммы
   }
   ds18b20Found=true;
-  if(OneWire::crc8(addr, 7) != addr[7]) return;           // перевіряємо 7 байт в addr - он содержит crc8 
+  if(OneWire::crc8(addr, 7) != addr[7]) return;           // Проверяем 7 байт в addr - он содержит crc8 
   ds.reset();
   ds.select(addr);
   ds.write(0x44, 1);
@@ -2697,7 +2806,7 @@ String chr_to_str(String str) {
   }
   return chr_to_str;
 }
-// ===========================КОНВЕРТАЦІЯ НАЗВ ДНІВ ТИЖНЯ НА УКРАЇНСЬКУ МОВУ============================================
+// ===========================КОНВЕРТАЦИЯ НАЗВАНИЙ ДНЕЙ НЕДЕЛИ НА УКРАИНСКИЙ ЯЗЫК============================================
 void convertDw(){
   switch(dayOfWeek){
     case 1 : dw = tSunday;    break;
@@ -2709,7 +2818,7 @@ void convertDw(){
     case 7 : dw = tSaturday;  break;
   }
 }
-// ===========================КОНВЕРТАЦІЯ НАЗВ МІСЯЦІВ НА УКРАЇНСЬКУ МОВУ============================================
+// ===========================КОНВЕРТАЦИЯ НАЗВАНИЙ МЕСЯЦЕВ НА УКРАИНСКИЙ ЯЗЫК============================================
 void convertMonth(){
   switch(month){
     case 1 : _month = tJanuary;      break;
@@ -2758,7 +2867,7 @@ void buttonInter(){
     butCount = 0;
   }
 }
-//------------- Обробка функцій кнопки -------------------------------------------------------
+//------------- Обработка функций кнопки -------------------------------------------------------
 void buttonHandling() {
   if(alarm_stat && (butMode||stopAlarm)) { // если будильник работает, то любое нажатие выключает его
     alarm_stat = 0;
@@ -2831,6 +2940,7 @@ void buttonHandling() {
     refreshAll();
     printStringWithShift(weatherString.c_str(), timeScrollSpeed, 1);
     printStringWithShift(weatherStringZ.c_str(), timeScrollSpeed, 1);
+    printStringWithShift(currencyString.c_str(), timeScrollSpeed, 1);
     clr(1);
     refreshAll();
   }
